@@ -1,0 +1,337 @@
+# ---------------------------------------------------------------------------
+# Source-to-standardized schema mapping for the BTS On-Time Performance CSV.
+#
+# Verified against a real 2025-01 download: 110 source columns, of which the
+# 26 mapped below are in scope. Names are matched exactly against the CSV
+# header; `source` columns are selected on read so that the 84 unused columns
+# (diversion legs, taxi times, gate return details, ...) never enter memory.
+#
+# `required: true`  -> cleaning fails fast if the column is missing.
+# `required: false` -> analysis that depends on it is disabled and the fact is
+#                      recorded in the data-quality report.
+# ---------------------------------------------------------------------------
+source:
+  provider: BTS
+  dataset: On_Time_Reporting_Carrier_On_Time_Performance
+  encoding: utf-8-sig
+  delimiter: ","
+  null_markers: ["", "NA", "N/A", "NULL", "null", "None", "-"]
+  checksum_algorithm: sha256
+
+fields:
+  - name: flight_date
+    source: FlightDate
+    dtype: date
+    required: true
+    unit: calendar date (local)
+    description: Scheduled flight date as reported by the carrier.
+    validity: Must parse as YYYY-MM-DD and fall inside 1987-01-01..today+1.
+    missing_handling: Row is quarantined (key field).
+    used_by: [airline, airport, route, monthly, delay_causes, cancellations]
+
+  - name: airline_code
+    source: Reporting_Airline
+    dtype: string
+    required: true
+    unit: IATA carrier code
+    description: Two-character reporting carrier code (e.g. AA, WN).
+    validity: 2-3 uppercase alphanumeric characters.
+    missing_handling: Row is quarantined (key field).
+    used_by: [airline, monthly, delay_causes, cancellations]
+
+  - name: flight_number
+    source: Flight_Number_Reporting_Airline
+    dtype: string
+    required: false
+    unit: carrier flight number
+    description: Carrier-assigned flight number, used by the dedupe rule.
+    validity: Digits only.
+    missing_handling: Null is allowed; row still participates in analysis.
+    used_by: [dedupe_only]
+
+  - name: origin_airport
+    source: Origin
+    dtype: string
+    required: true
+    unit: IATA airport code
+    description: Departure airport.
+    validity: 3-4 uppercase alphanumeric characters.
+    missing_handling: Row is quarantined (key field).
+    used_by: [airport_departure, route, cancellations]
+
+  - name: origin_city
+    source: OriginCityName
+    dtype: string
+    required: false
+    unit: text
+    description: Origin city and state, e.g. "New York, NY".
+    validity: Free text.
+    missing_handling: Null is allowed.
+    used_by: [dashboard_labels]
+
+  - name: origin_state
+    source: OriginState
+    dtype: string
+    required: false
+    unit: 2-letter state code
+    description: Origin state.
+    validity: Two uppercase letters.
+    missing_handling: Null is allowed.
+    used_by: [dashboard_labels]
+
+  - name: destination_airport
+    source: Dest
+    dtype: string
+    required: true
+    unit: IATA airport code
+    description: Arrival airport.
+    validity: 3-4 uppercase alphanumeric characters.
+    missing_handling: Row is quarantined (key field).
+    used_by: [airport_arrival, route]
+
+  - name: destination_city
+    source: DestCityName
+    dtype: string
+    required: false
+    unit: text
+    description: Destination city and state.
+    validity: Free text.
+    missing_handling: Null is allowed.
+    used_by: [dashboard_labels]
+
+  - name: destination_state
+    source: DestState
+    dtype: string
+    required: false
+    unit: 2-letter state code
+    description: Destination state.
+    validity: Two uppercase letters.
+    missing_handling: Null is allowed.
+    used_by: [dashboard_labels]
+
+  - name: scheduled_departure
+    source: CRSDepTime
+    dtype: hhmm
+    required: false
+    unit: local hhmm
+    description: Scheduled local departure time, normalized to 4 digits (hhmm).
+    validity: 0000-2359 (2400 folded to 0000).
+    missing_handling: Null is allowed; hour-of-day analysis skips the row.
+    used_by: [time_of_day]
+
+  - name: actual_departure
+    source: DepTime
+    dtype: hhmm
+    required: false
+    unit: local hhmm
+    description: Actual local departure time.
+    validity: 0000-2359.
+    missing_handling: Null is expected for cancelled flights.
+    used_by: [traceability]
+
+  - name: scheduled_arrival
+    source: CRSArrTime
+    dtype: hhmm
+    required: false
+    unit: local hhmm
+    description: Scheduled local arrival time, normalized to 4 digits.
+    validity: 0000-2359.
+    missing_handling: Null is allowed.
+    used_by: [traceability]
+
+  - name: actual_arrival
+    source: ArrTime
+    dtype: hhmm
+    required: false
+    unit: local hhmm
+    description: Actual local arrival time.
+    validity: 0000-2359.
+    missing_handling: Null is expected for cancelled flights.
+    used_by: [traceability]
+
+  - name: departure_delay
+    source: DepDelay
+    dtype: double
+    required: false
+    unit: minutes
+    description: Departure delay; negative means early departure.
+    validity: -300..5000 minutes.
+    missing_handling: Null is excluded from departure statistics; never coerced to 0.
+    used_by: [airport_departure, monthly, delay_categories]
+
+  - name: arrival_delay
+    source: ArrDelay
+    dtype: double
+    required: false
+    unit: minutes
+    description: Arrival delay; negative means early arrival. Primary delay metric.
+    validity: -300..5000 minutes.
+    missing_handling: >-
+      Null is expected for cancelled and most diverted flights. Such rows are
+      excluded from arrival-delay numerators and denominators, never treated as 0.
+    used_by: [airline, airport_arrival, route, monthly, delay_categories]
+
+  - name: cancelled
+    source: Cancelled
+    dtype: flag
+    required: true
+    unit: 0/1
+    description: 1 when the flight was cancelled.
+    validity: Exactly 0 or 1.
+    missing_handling: Row is quarantined.
+    used_by: [cancellations, summary]
+
+  - name: diverted
+    source: Diverted
+    dtype: flag
+    required: true
+    unit: 0/1
+    description: 1 when the flight landed at an airport other than the destination.
+    validity: Exactly 0 or 1.
+    missing_handling: Row is quarantined.
+    used_by: [summary]
+
+  - name: distance
+    source: Distance
+    dtype: double
+    required: false
+    unit: miles
+    description: Great-circle distance between origin and destination.
+    validity: 0..12000 miles.
+    missing_handling: Null is allowed; long-haul analysis skips the row.
+    used_by: [dashboard_labels]
+
+  - name: cancellation_code
+    source: CancellationCode
+    dtype: string
+    required: false
+    unit: A/B/C/D
+    description: >-
+      A = carrier, B = weather, C = national aviation system, D = security.
+      Populated only when cancelled = 1.
+    validity: One of A, B, C, D or null.
+    missing_handling: Null for non-cancelled flights is expected, not an error.
+    used_by: [cancellations]
+
+  - name: carrier_delay
+    source: CarrierDelay
+    dtype: double
+    required: false
+    unit: minutes
+    description: Delay minutes attributed to the air carrier.
+    validity: 0..5000 minutes.
+    missing_handling: >-
+      BTS populates cause fields only for flights with arrival delay >= 15 min.
+      Null therefore means "no cause reported", not "zero minutes".
+    used_by: [delay_causes]
+
+  - name: weather_delay
+    source: WeatherDelay
+    dtype: double
+    required: false
+    unit: minutes
+    description: Delay minutes attributed to extreme weather.
+    validity: 0..5000 minutes.
+    missing_handling: As for carrier_delay.
+    used_by: [delay_causes]
+
+  - name: nas_delay
+    source: NASDelay
+    dtype: double
+    required: false
+    unit: minutes
+    description: Delay minutes attributed to the National Aviation System.
+    validity: 0..5000 minutes.
+    missing_handling: As for carrier_delay.
+    used_by: [delay_causes]
+
+  - name: security_delay
+    source: SecurityDelay
+    dtype: double
+    required: false
+    unit: minutes
+    description: Delay minutes attributed to security screening or evacuation.
+    validity: 0..5000 minutes.
+    missing_handling: As for carrier_delay.
+    used_by: [delay_causes]
+
+  - name: late_aircraft_delay
+    source: LateAircraftDelay
+    dtype: double
+    required: false
+    unit: minutes
+    description: Delay minutes attributed to a previous flight with the same aircraft.
+    validity: 0..5000 minutes.
+    missing_handling: As for carrier_delay.
+    used_by: [delay_causes]
+
+derived_fields:
+  - name: flight_year
+    definition: Year of flight_date.
+    dtype: int
+  - name: flight_month
+    definition: Month of flight_date (1-12).
+    dtype: int
+  - name: day_of_week
+    definition: ISO day of week of flight_date (1=Monday, 7=Sunday).
+    dtype: int
+  - name: dep_hour
+    definition: Hour extracted from scheduled_departure (0-23), null when unknown.
+    dtype: int
+  - name: departure_delay_minutes
+    definition: max(departure_delay, 0); the delay-minute quantity BTS reports.
+    dtype: double
+  - name: arrival_delay_minutes
+    definition: max(arrival_delay, 0); null when arrival_delay is null.
+    dtype: double
+  - name: is_departure_delayed
+    definition: 1 when departure_delay >= 15 minutes, else 0; null when unknown.
+    dtype: int
+  - name: is_arrival_delayed
+    definition: 1 when arrival_delay >= 15 minutes, else 0; null when unknown.
+    dtype: int
+  - name: delay_category
+    definition: >-
+      on_time (<15), minor (15-29), moderate (30-59), severe (>=60) based on
+      arrival_delay; "unknown" when arrival_delay is null (cancelled/diverted).
+    dtype: string
+  - name: route
+    definition: origin_airport + "-" + destination_airport.
+    dtype: string
+
+# Canonical column order of the cleaned dataset. Hive DDL mirrors this exactly.
+cleaned_column_order:
+  - flight_date
+  - flight_year
+  - flight_month
+  - day_of_week
+  - airline_code
+  - flight_number
+  - origin_airport
+  - origin_city
+  - origin_state
+  - destination_airport
+  - destination_city
+  - destination_state
+  - route
+  - scheduled_departure
+  - actual_departure
+  - dep_hour
+  - departure_delay
+  - departure_delay_minutes
+  - scheduled_arrival
+  - actual_arrival
+  - arrival_delay
+  - arrival_delay_minutes
+  - is_departure_delayed
+  - is_arrival_delayed
+  - delay_category
+  - cancelled
+  - diverted
+  - cancellation_code
+  - distance
+  - carrier_delay
+  - weather_delay
+  - nas_delay
+  - security_delay
+  - late_aircraft_delay

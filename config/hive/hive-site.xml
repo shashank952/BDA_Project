@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Hive configuration for a single-node Windows development install.
+
+  Metastore: embedded Derby. It requires a single Hive session at a time, which
+  is acceptable for this academic project and is recorded in docs/limitations.md.
+  MapReduce: forced to LocalJobRunner for the same Windows symlink-privilege
+  reason documented for the streaming jobs.
+-->
+<configuration>
+  <property>
+    <name>javax.jdo.option.ConnectionURL</name>
+    <value>jdbc:derby:;databaseName=D:/BDA_2/metastore/metastore_db;create=true</value>
+  </property>
+  <property>
+    <name>javax.jdo.option.ConnectionDriverName</name>
+    <value>org.apache.derby.jdbc.EmbeddedDriver</value>
+  </property>
+  <property>
+    <name>javax.jdo.option.ConnectionUserName</name>
+    <value>APP</value>
+  </property>
+  <property>
+    <name>javax.jdo.option.ConnectionPassword</name>
+    <value>mine</value>
+  </property>
+  <property>
+    <name>datanucleus.schema.autoCreateAll</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>hive.metastore.schema.verification</name>
+    <value>false</value>
+  </property>
+  <property>
+    <name>hive.metastore.warehouse.dir</name>
+    <value>/user/hive/warehouse</value>
+  </property>
+  <property>
+    <name>hive.downloaded.resources.dir</name>
+    <value>D:/BDA_2/metastore/resources</value>
+  </property>
+  <property>
+    <name>hive.exec.scratchdir</name>
+    <value>/tmp/hive</value>
+  </property>
+  <property>
+    <name>hive.execution.engine</name>
+    <value>mr</value>
+  </property>
+  <property>
+    <name>mapreduce.framework.name</name>
+    <value>local</value>
+  </property>
+  <property>
+    <name>hive.exec.mode.local.auto</name>
+    <value>false</value>
+  </property>
+  <property>
+    <name>hive.cli.print.header</name>
+    <value>false</value>
+  </property>
+  <property>
+    <name>hive.server2.enable.doAs</name>
+    <value>false</value>
+  </property>
+  <property>
+    <name>hive.exec.dynamic.partition</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>hive.exec.dynamic.partition.mode</name>
+    <value>nonstrict</value>
+  </property>
+  <property>
+    <name>hive.exec.mode.local.auto.input.files.max</name>
+    <value>0</value>
+  </property>
+  <property>
+    <name>hive.exec.mode.local.auto.inputbytes.max</name>
+    <value>0</value>
+  </property>
+</configuration>

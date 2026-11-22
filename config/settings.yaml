@@ -1,0 +1,81 @@
+# ---------------------------------------------------------------------------
+# Project-wide configuration. No machine-specific absolute paths here: every
+# path is relative to the repository root and can be overridden with env vars.
+# ---------------------------------------------------------------------------
+project:
+  name: airline-flight-delay-analysis
+  title: Airline Flight Delay Analysis and Performance Monitoring Using Apache Hadoop
+  version: "1.0.0"
+  # Dataset period actually processed by the pipeline (updated by the pipeline).
+  evaluation_period: "2025-01..2025-12"
+
+paths:
+  data_raw: data/raw
+  data_processed: data/processed
+  data_quarantine: data/quarantine
+  data_sample: data/sample
+  outputs: outputs
+  analytics_outputs: outputs/analytics
+  reports: outputs/reports
+  logs: logs
+  metastore: metastore
+
+hive:
+  home: D:/hive/apache-hive-3.1.3-bin
+  conf_dir: config/hive
+  database: airline_analytics
+  execution_engine: mr
+
+hdfs:
+  uri: hdfs://localhost:9000
+  base: /airline-delay
+  hadoop_home: D:/hadoop/hadoop-3.2.4
+  java_home: D:/java/jdk8u504-b01
+  # YARN container launch requires SeCreateSymbolicLinkPrivilege on Windows.
+  # When unavailable, Hadoop MapReduce runs through LocalJobRunner.
+  framework: local
+  streaming_jar: share/hadoop/tools/lib/hadoop-streaming-3.2.4.jar
+
+dataset:
+  provider: BTS
+  name: On-Time Performance (1987-present)
+  url: https://www.transtats.bts.gov/
+  license_note: >-
+    U.S. federal government data distributed by the Bureau of Transportation
+    Statistics. Verify current terms before redistribution; raw archives are
+    intentionally not committed to git.
+  raw_layout: data/raw/bts/year={year}/month={month:02d}
+
+cleaning:
+  # Project-defined analytical thresholds (not official aviation standards).
+  on_time_threshold_minutes: 15
+  minor_delay_upper_minutes: 30
+  moderate_delay_upper_minutes: 60
+  # Plausibility bounds used to quarantine corrupt measurements.
+  min_plausible_delay_minutes: -300
+  max_plausible_delay_minutes: 5000
+  max_plausible_distance_miles: 12000
+  # Deduplication rule: rows repeating this natural key keep the first
+  # occurrence; the remainder are counted as duplicates removed.
+  dedupe_key:
+    - flight_date
+    - airline_code
+    - flight_number
+    - origin_airport
+    - destination_airport
+
+analytics:
+  # Routes below this many flights are excluded from route rankings so that a
+  # single unusual flight cannot dominate.
+  min_route_flights: 100
+  top_n: 10
+
+api:
+  host: 127.0.0.1
+  port: 5050
+  default_limit: 50
+  max_limit: 500
+
+dashboard:
+  api_url: http://127.0.0.1:5050
+  cache_ttl_seconds: 60

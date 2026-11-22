@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.env
+
+# Downloaded data and generated artefacts are reproducible from the pipeline.
+data/raw/
+data/processed/
+data/quarantine/
+outputs/
+logs/
+metastore/
+
+# Tooling downloads
+apache-hive-*.tar.gz
+*.log
+
+# Local agent/code-intelligence tooling state
+.codegraph/
+.omo/
+
+# Stray captured stderr logs
+*.log.err
